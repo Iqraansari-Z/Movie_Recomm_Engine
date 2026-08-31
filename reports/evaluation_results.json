@@ -1,0 +1,54 @@
+{
+  "rating_prediction": {
+    "global_mean": {
+      "rmse": 1.1478,
+      "mae": 0.9447
+    },
+    "movie_average": {
+      "rmse": 0.9894,
+      "mae": 0.7869
+    },
+    "item_item_cf": {
+      "rmse": 0.9937,
+      "mae": 0.7693
+    },
+    "svd_k50": {
+      "rmse": 1.0287,
+      "mae": 0.8076
+    },
+    "als_best": {
+      "rmse": 0.875,
+      "mae": 0.6901
+    }
+  },
+  "ranking_quality_at_10": {
+    "popularity": {
+      "precision": 0.08966666666666667,
+      "recall": 0.04839248209690679,
+      "ndcg": 0.23311556150579388,
+      "hit_rate": 0.36666666666666664
+    },
+    "als": {
+      "precision": 0.020666666666666667,
+      "recall": 0.010031171534347917,
+      "ndcg": 0.0619310347740666,
+      "hit_rate": 0.15333333333333332
+    }
+  },
+  "cold_start_analysis": {
+    "cold_users": {
+      "n": 109,
+      "precision": 0.003669724770642202,
+      "recall": 0.008460754332313965,
+      "hit_rate": 0.03669724770642202
+    },
+    "regular_users": {
+      "n": 191,
+      "precision": 0.03036649214659686,
+      "recall": 0.010927378209854205,
+      "hit_rate": 0.2198952879581152
+    }
+  },
+  "eval_sample_size": 300,
+  "k": 10
+}
