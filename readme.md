@@ -10,6 +10,7 @@ A recommendation system (RecSys) that models user preferences from rating histor
 - Uses Spark ALS (matrix factorization) blended with a popularity score for users with enough rating history
 - Falls back to popularity-based recommendations for cold-start users (50 or fewer ratings) and for unknown user IDs
 - Shows which strategy produced each result set, with adjustable list size and popularity-blend weight
+- Includes a "Pick your genres" tab for users with no rating history: choose genres and get the most popular matching movies, with an option to require all selected genres
 
 ## Dataset
 
@@ -94,7 +95,6 @@ The two files the demo needs (`models/recommendation_artifacts.pkl` and `data/pr
 
 - Learned hybrid of ALS and content-based (genre) scores
 - Implicit-feedback ALS or a ranking-specific loss to improve top-N quality
-- Genre-picker mode for users with no rating history
 - Full test-set evaluation with distributed evaluation
 
 ## Tech stack
