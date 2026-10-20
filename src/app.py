@@ -100,6 +100,11 @@ popularity_score = artifacts["popularity_score"]
 train_seen = artifacts["train_seen"]
 train_counts_per_user = artifacts["train_counts_per_user"]
 COLD_START_THRESHOLD = artifacts["cold_start_threshold"]
+
+
+# ---------------------------------------------------------------------------
+# Recommendation logic
+# ---------------------------------------------------------------------------
 def get_recommendations(user_id, n=10, popularity_weight=0.3):
     """
     Returns (dataframe of recommendations, strategy used).
@@ -141,6 +146,54 @@ def get_recommendations(user_id, n=10, popularity_weight=0.3):
 
 def get_valid_user_ids():
     return sorted(user_to_idx.keys())
+
+
+def get_all_genres():
+    return sorted({g for gs in movies["genres"] for g in gs.split("|")})
+
+
+def recommend_by_genres(selected_genres, n=10, match_all=False):
+    """
+    Rank movies that match the chosen genres by popularity.
+    match_all=True requires every chosen genre; False requires at least one.
+    """
+    selected = set(selected_genres)
+
+    def matches(genre_str):
+        movie_genres = set(genre_str.split("|"))
+        return selected <= movie_genres if match_all else bool(selected & movie_genres)
+
+    pool = movies[movies["genres"].apply(matches)].copy()
+    pool["pop"] = pool["movie_idx"].map(popularity_score).fillna(0)
+    top = pool.sort_values("pop", ascending=False).head(n)
+    return top[["movie_id", "title", "genres"]].reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------
+# UI helpers
+# ---------------------------------------------------------------------------
+def render_cards(recs_df, cols_per_row=5):
+    """Show a dataframe of movies as a grid of cards."""
+    rows = [recs_df.iloc[i:i + cols_per_row] for i in range(0, len(recs_df), cols_per_row)]
+    rank = 1
+    for row_chunk in rows:
+        cols = st.columns(cols_per_row)
+        for col, (_, movie) in zip(cols, row_chunk.iterrows()):
+            genre_tags = "".join(
+                f'<span class="movie-genre-tag">{g}</span>'
+                for g in movie["genres"].split("|")
+            )
+            with col:
+                st.markdown(f"""
+                    <div class="movie-card">
+                        <div class="rank-badge">#{rank}</div>
+                        <div class="movie-title">{movie['title']}</div>
+                        <div>{genre_tags}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            rank += 1
+
+
 # ---- Header ----
 st.title("🎬 Movie Recommendation Engine")
 st.markdown(
@@ -149,9 +202,9 @@ st.markdown(
 )
 st.divider()
 
-# ---- Sidebar ----
+# ---- Sidebar (used by the personalized tab) ----
 with st.sidebar:
-    st.header("Get Recommendations")
+    st.header("Personalized (user ID)")
 
     valid_user_ids = get_valid_user_ids()
 
@@ -189,35 +242,47 @@ with st.sidebar:
     st.divider()
     st.caption("Built on MovieLens 1M · Spark MLlib ALS · scikit-learn")
 
-# ---- Main content ----
+# Keep the last personalized result so it survives interactions in the other tab
 if generate:
     with st.spinner("Generating recommendations..."):
         recs_df, strategy = get_recommendations(int(user_id), n=n_recs, popularity_weight=pop_weight)
+    st.session_state["personalized"] = (recs_df, strategy)
 
-    st.markdown(f'<div class="strategy-badge">Strategy: {strategy}</div>', unsafe_allow_html=True)
+# ---- Main content: two tabs ----
+tab_personal, tab_genre = st.tabs(["Personalized (user ID)", "Pick your genres"])
 
-    if recs_df.empty:
-        st.warning("No recommendations could be generated for this user.")
+with tab_personal:
+    if "personalized" in st.session_state:
+        recs_df, strategy = st.session_state["personalized"]
+        st.markdown(f'<div class="strategy-badge">Strategy: {strategy}</div>', unsafe_allow_html=True)
+        if recs_df.empty:
+            st.warning("No recommendations could be generated for this user.")
+        else:
+            render_cards(recs_df)
     else:
-        cols_per_row = 5
-        rows = [recs_df.iloc[i:i + cols_per_row] for i in range(0, len(recs_df), cols_per_row)]
+        st.info("👈 Select a user in the sidebar and click **Get Recommendations** to see personalized movie suggestions.")
 
-        rank = 1
-        for row_chunk in rows:
-            cols = st.columns(cols_per_row)
-            for col, (_, movie) in zip(cols, row_chunk.iterrows()):
-                genre_tags = "".join(
-                    f'<span class="movie-genre-tag">{g}</span>'
-                    for g in movie["genres"].split("|")
-                )
-                with col:
-                    st.markdown(f"""
-                        <div class="movie-card">
-                            <div class="rank-badge">#{rank}</div>
-                            <div class="movie-title">{movie['title']}</div>
-                            <div>{genre_tags}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                rank += 1
-else:
-    st.info("👈 Select a user and click **Get Recommendations** to see personalized movie suggestions.")
+with tab_genre:
+    st.subheader("Tell us what you like")
+    st.caption("No user ID needed. Pick genres and we'll show the most popular matching movies.")
+
+    chosen_genres = st.multiselect("Genres", options=get_all_genres())
+    g_col1, g_col2 = st.columns(2)
+    with g_col1:
+        match_all = st.checkbox("Must match all selected genres", value=False)
+    with g_col2:
+        g_n = st.slider("Number of movies", min_value=5, max_value=20, value=10, key="genre_n")
+
+    if not chosen_genres:
+        st.info("Select at least one genre to see recommendations.")
+    else:
+        genre_recs = recommend_by_genres(chosen_genres, n=g_n, match_all=match_all)
+        mode_text = "all" if match_all else "any"
+        st.markdown(
+            f'<div class="strategy-badge">Strategy: Genre filter (match {mode_text} of selected) ranked by popularity</div>',
+            unsafe_allow_html=True,
+        )
+        if genre_recs.empty:
+            st.warning("No movies match that combination. Try fewer genres or untick the match-all box.")
+        else:
+            render_cards(genre_recs)
