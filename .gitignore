@@ -31,3 +31,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+!models/recommendation_artifacts.pkl
+!data/processed/movies_final.parquet
